@@ -34,7 +34,7 @@ class DocRetrieval:
 
     
     def retrieve(self, transform):
-        index = similarities.MatrixSimilarity(transform[self.corpus], num_features=174289)
+        index = similarities.MatrixSimilarity(transform[self.corpus])
         ans = {'topic': [], 'doc': []}
 
         for i, q in enumerate(self.query2bow):

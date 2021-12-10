@@ -1,0 +1,6 @@
+__pycahche__/*
+cache/*
+doc/*
+test_query/*
+train_query/*
+*.csv
