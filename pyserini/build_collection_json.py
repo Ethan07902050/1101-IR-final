@@ -25,6 +25,7 @@ def build_collection_json(src_dir: Path, dest_dir: Path):
 
 
 if __name__ == "__main__":
-    doc_dir = Path("data") / "doc"
-    json_dir = Path("data") / "doc_json"
+    data_path = Path("data")
+    doc_dir = data_path / "doc"
+    json_dir = data_path / "doc_json"
     build_collection_json(doc_dir, json_dir)
