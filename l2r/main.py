@@ -4,8 +4,7 @@ import pandas as pd
 from pandas.core.frame import DataFrame
 
 import l2r
-import feat_generator
-from doc_helper import DocCollection
+from feat_generator import GenFeat
 from utils import map_at_k
 
 model_path = 'model'
@@ -22,7 +21,7 @@ def load_data():
     return train_df, test_df, model
 
 def gen_feature(mode: str):
-    gen = feat_generator.GenFeat(mode, gt_path)
+    gen = GenFeat(mode, gt_path)
     gen.gen_feat()
 
 def get_result(model, df: DataFrame):
