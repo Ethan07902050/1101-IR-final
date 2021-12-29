@@ -3,4 +3,5 @@ cache/*
 doc/*
 test_query/*
 train_query/*
+data/*
 *.csv
