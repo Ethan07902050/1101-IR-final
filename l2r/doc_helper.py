@@ -84,7 +84,7 @@ class Doc2Bow:
         else:
             dictionary = corpora.Dictionary(self.docs) # 12/28: Remove Prun at
 
-            once_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq == 1]
+            once_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq <= 2] # 12/29 thresh = 2
             dictionary.filter_tokens(once_ids)
             dictionary.compactify()  # remove gaps in id sequence after words that were removed
             dictionary.save(self.dict_path)

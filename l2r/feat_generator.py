@@ -1,21 +1,21 @@
 import os
 import csv
 import pandas as pd
-from gensim import models
+from gensim.models import TfidfModel, LsiModel, LdaModel
+from gensim.summarization.bm25 import BM25
 from gensim.similarities import Similarity
 from doc_helper import DocRetrieval
 
 class GenFeat:
-    def __init__(self, mode: str, gt_path: str):
+    def __init__(self, gt_path: str, mode='all'):
         self.mode = mode
-        self.path_ans = gt_path
-        self.ans = self.parse_ans()
+        self.ans = self.parse_ans(gt_path)
         self.corpus = DocRetrieval(mode)
-        self.file_path = f'feat_{mode}.csv'
+        self.models = [TfidfModel, LsiModel, LdaModel]
 
-    def parse_ans(self):
+    def parse_ans(self, gt_path: str):
         ans = dict()
-        with open(self.path_ans, newline='') as csvfile:
+        with open(gt_path, newline='') as csvfile:
             rows = csv.DictReader(csvfile)
             for row in rows:
                 qid = row['topic']
@@ -24,18 +24,27 @@ class GenFeat:
         
         return ans
     
-    def build_index(self, transform):
-        index_path = f'./cache_sim/{self.mode}'
-        if len(os.listdir(index_path)) > 1:
-            index = Similarity.load(f'{index_path}/pre')
+    def build_model(self, idx, model_cls):
+        model_path = f'./cache_mod/{self.mode}/feat{idx}'
+        if os.path.exists(model_path):
+            model = model_cls.load(model_path)
         else:
-            index = Similarity(f'{index_path}/pre', transform[self.corpus.corpus], len(self.corpus.doc2bow.dictionary))
-            index.save(f'{index_path}/pre')
+            model = model_cls(self.corpus.corpus)
+            model.save(model_path)
+        
+        return model
+
+    def build_index(self, idx, transform):
+        index_path = f'./cache_sim/{self.mode}/feat{idx}'
+        if os.path.exists(index_path):
+            index = Similarity.load(index_path)
+        else:
+            index = Similarity(index_path, transform[self.corpus.corpus], len(self.corpus.doc2bow.dictionary))
+            index.save(index_path)
         
         return index
 
-
-    def gen_feat(self):
+    def gen_feat(self, file_path: str):
         def fill_qid(df, qid):
             df = df.assign(q_id=[qid] * 100000)
             return df
@@ -45,32 +54,30 @@ class GenFeat:
             return df
         
         def fill_label(df, qid, ans):
-            if self.mode == 'train':
+            if qid in ans.keys():
                 df = df.assign(label=df["doc_id"].map(lambda x: 1 if x in ans[qid] else 0))
             else:
                 df = df.assign(label=[0] * 100000)
             return df
         
-        def fill_feat(df, feat):
-            df = df.assign(feature=feat)
+        def fill_feat(df, features):
+            for i, feat in enumerate(features):
+                df[f'feat{i}'] = feat
             return df
-    
-        if os.path.exists(self.file_path):
-            print(f'Feature of "{self.mode}" already exists!')
-            return None
+        
+        modeles = [self.build_model(i, model) for i, model in enumerate(self.models)]
+        indices = [self.build_index(i, model) for i, model in enumerate(modeles)]
+        bm25_mod = BM25(self.corpus.corpus)
 
-        tfidf = models.TfidfModel(self.corpus.corpus)
-        index = self.build_index(tfidf)
-
-        pd.DataFrame(columns=['q_id', 'doc_id', 'label', 'feature']).to_csv(self.file_path, index=False)
+        pd_columns = ['q_id', 'doc_id', 'label'] + [f'feat{i}' for i, _ in enumerate(modeles)] + ['feat3']
+        pd.DataFrame(columns=pd_columns).to_csv(file_path, index=False)
         for i, q in enumerate(self.corpus.query2bow):
             qid = self.corpus.query.no2id[i]
-            sims = index[tfidf[q]]
+            sims = [index[model[q]] for index, model in zip(indices, modeles)] + [bm25_mod.get_scores(q)]
 
             df = (pd.DataFrame().pipe(fill_qid, qid)
                                 .pipe(fill_docid, self.corpus.documents.no2id)
                                 .pipe(fill_label, qid, self.ans)
                                 .pipe(fill_feat, sims))
             
-            df.to_csv(self.file_path, mode='a', header=None, index=False)
-            
+            df.to_csv(file_path, mode='a', header=None, index=False)

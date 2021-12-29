@@ -1,12 +1,16 @@
+import os
 import numpy as np
 import pandas as pd
 import xgboost as xgb
 from pandas.core.frame import DataFrame
 
 class MyModel:
-    def __init__(self, df: DataFrame):
-        self.df = df
+    def __init__(self, model_path: str, df: DataFrame):
         self.dropped_cols = ["q_id", "doc_id", "label"]
+        if not os.path.exists(model_path):
+            self.train(model_path, df)
+        self.model = xgb.XGBRanker()
+        self.model.load_model(model_path)
 
     def load_data(self, df: DataFrame):    
         X = df.drop(self.dropped_cols, axis=1)
@@ -15,26 +19,16 @@ class MyModel:
         
         return X, y, qids
 
-    def train(self, model_path: str):
-        X_train, y_train, qids_train = self.load_data(self.df)
-        model = xgb.XGBRanker(  
+    def train(self, model_path: str, df: DataFrame):
+        X_train, y_train, qids_train = self.load_data(df)
+        model = xgb.XGBRanker(
             tree_method='exact',
             booster='gbtree',
-            objective='rank:ndcg',
-            random_state=42, 
-            learning_rate=0.1,
-            colsample_bytree=0.9, 
-            eta=0.05, 
-            max_depth=6, 
-            n_estimators=110, 
-            subsample=0.75
+            objective='rank:map',
         )
 
         model.fit(X_train, y_train, group=qids_train, verbose=True)
         model.save_model(model_path)
     
-    def predict(self, model_path: str, df: str):
-        model = xgb.XGBRanker()
-        model.load_model(model_path)
-
-        return model.predict(df.loc[:, ~df.columns.isin(self.dropped_cols)])
+    def predict(self, df: DataFrame):
+        return self.model.predict(df.loc[:, ~df.columns.isin(self.dropped_cols)])

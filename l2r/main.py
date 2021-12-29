@@ -4,47 +4,50 @@ import pandas as pd
 from pandas.core.frame import DataFrame
 
 import l2r
-from feat_generator import GenFeat
 from utils import map_at_k
+from feat_generator import GenFeat
 
-model_path = 'model'
 gt_path = './dataset/train_ans.csv'
-df_type = {'q_id': int, 'doc_id': int, 'label': bool, 'feature': float}
+df_path = './feat.csv'
+model_path = './model'
+pred_path = './pred.csv'
+
+df_type = {'q_id': int, 'doc_id': int, 'label': int, 'feat0': float, 'feat1': float, 'feat2': float, 'feat3': float}
+split = {'train': map(int, os.listdir('./dataset/train_query')),
+         'test': map(int, os.listdir('./dataset/test_query'))}
 no2id = [filename for filename in os.listdir('./dataset/doc')]
 
 def load_data():
-    train_df = pd.read_csv(f'feat_train.csv', dtype=df_type)
-    test_df = pd.read_csv(f'feat_test.csv', dtype=df_type)
-    model = l2r.MyModel(train_df)
-    model.train(model_path)
+    df = pd.read_csv(df_path, dtype=df_type)
+    train_df = df.loc[df['q_id'].isin(split['train'])]
+    test_df = df.loc[df['q_id'].isin(split['test'])]
 
-    return train_df, test_df, model
-
-def gen_feature(mode: str):
-    gen = GenFeat(mode, gt_path)
-    gen.gen_feat()
+    return train_df, test_df
 
 def get_result(model, df: DataFrame):
-    pred = (df.groupby('q_id').apply(lambda x: model.predict(model_path, x))
+    pred = (df.groupby('q_id').apply(lambda x: model.predict(x))
               .apply(lambda x: np.argsort(x)[::-1][:50])
               .apply(lambda x: " ".join([no2id[i] for i in x]))
               .reset_index()
               .rename(columns={'q_id': 'topic', 0: 'doc'})
     )
-    pred.to_csv(f'pred.csv', index=None)
+    pred.to_csv(pred_path, index=None)
 
 def main():
-    gen_feature('train')
-    gen_feature('test')
+    # Generate feature and load
+    gen = GenFeat(gt_path)
+    gen.gen_feat(df_path)
+    train_df, test_df = load_data()
 
-    train_df, test_df, model = load_data()
+    # Train model
+    model = l2r.MyModel(model_path, train_df)
     
+    # Get predicted results
     get_result(model, train_df)
-    score = map_at_k('pred.csv', gt_path, 50)
+    score = map_at_k(pred_path, gt_path, 50)
     get_result(model, test_df)
 
     print(f'------\nDone! MAP@50 = {round(score, 3)}\n------')
 
 if __name__ == '__main__':
     main()
-    
