@@ -1,28 +1,18 @@
 import os
-import csv
 import pandas as pd
+import numpy as np
 from gensim.models import TfidfModel, LsiModel, LdaModel
 from gensim.summarization.bm25 import BM25
 from gensim.similarities import Similarity
 from doc_helper import DocRetrieval
+from utils import read_pred
 
 class GenFeat:
     def __init__(self, gt_path: str, mode='all'):
         self.mode = mode
-        self.ans = self.parse_ans(gt_path)
+        self.ans = read_pred(gt_path)
         self.corpus = DocRetrieval(mode)
         self.models = [TfidfModel, LsiModel, LdaModel]
-
-    def parse_ans(self, gt_path: str):
-        ans = dict()
-        with open(gt_path, newline='') as csvfile:
-            rows = csv.DictReader(csvfile)
-            for row in rows:
-                qid = row['topic']
-                docs = row['doc'].split()
-                ans[qid] = docs
-        
-        return ans
     
     def build_model(self, idx, model_cls):
         model_path = f'./cache_mod/{self.mode}/feat{idx}'
@@ -45,39 +35,36 @@ class GenFeat:
         return index
 
     def gen_feat(self, file_path: str):
-        def fill_qid(df, qid):
-            df = df.assign(q_id=[qid] * 100000)
+        def fill_init(df, qids, dids):
+            df = pd.DataFrame(index=pd.MultiIndex.from_product([qids, dids], names=['q_id', 'doc_id'])).reset_index()
             return df
         
-        def fill_docid(df, did):
-            df = df.assign(doc_id=did)
+        def fill_label(df):
+            df['label'] = df.apply(lambda row: 1 if row.q_id in self.ans.keys() and row.doc_id in self.ans[row.q_id] else 0, axis=1)
             return df
         
-        def fill_label(df, qid, ans):
-            if qid in ans.keys():
-                df = df.assign(label=df["doc_id"].map(lambda x: 1 if x in ans[qid] else 0))
-            else:
-                df = df.assign(label=[0] * 100000)
+        def fill_feat(df, feature):
+            df[f'feat{len(df.columns) - 3}'] = feature
             return df
-        
-        def fill_feat(df, features):
-            for i, feat in enumerate(features):
-                df[f'feat{i}'] = feat
-            return df
-        
-        modeles = [self.build_model(i, model) for i, model in enumerate(self.models)]
-        indices = [self.build_index(i, model) for i, model in enumerate(modeles)]
+
+        qids = self.corpus.query.no2id
+        dids = self.corpus.documents.no2id
+        df = (pd.DataFrame().pipe(fill_init, qids, dids)
+                            .pipe(fill_label)
+        )
+
+        for i, model in enumerate(self.models):
+            model = self.build_model(i, model)
+            index = self.build_index(i, model)
+
+            sims = map(lambda q: index[model[q]], self.corpus.query2bow)
+            df = df.pipe(fill_feat, np.vstack(sims).ravel())
+
         bm25_mod = BM25(self.corpus.corpus)
+        sims = map(lambda q: bm25_mod.get_scores(q), self.corpus.query2bow)
+        df = df.pipe(fill_feat, np.vstack(sims).ravel())
 
-        pd_columns = ['q_id', 'doc_id', 'label'] + [f'feat{i}' for i, _ in enumerate(modeles)] + ['feat3']
-        pd.DataFrame(columns=pd_columns).to_csv(file_path, index=False)
-        for i, q in enumerate(self.corpus.query2bow):
-            qid = self.corpus.query.no2id[i]
-            sims = [index[model[q]] for index, model in zip(indices, modeles)] + [bm25_mod.get_scores(q)]
+        df.to_csv(file_path, index=False)
 
-            df = (pd.DataFrame().pipe(fill_qid, qid)
-                                .pipe(fill_docid, self.corpus.documents.no2id)
-                                .pipe(fill_label, qid, self.ans)
-                                .pipe(fill_feat, sims))
             
-            df.to_csv(file_path, mode='a', header=None, index=False)
+            

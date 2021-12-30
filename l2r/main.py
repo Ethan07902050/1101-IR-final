@@ -34,12 +34,13 @@ def get_result(model, df: DataFrame):
     pred.to_csv(pred_path, index=None)
 
 def main():
-    # Generate feature and load
-    gen = GenFeat(gt_path)
-    gen.gen_feat(df_path)
-    train_df, test_df = load_data()
-
+    # Generate feature file
+    if not os.path.exists(df_path):
+        gen = GenFeat(gt_path)
+        gen.gen_feat(df_path)
+    
     # Train model
+    train_df, test_df = load_data()
     model = l2r.MyModel(model_path, train_df)
     
     # Get predicted results
