@@ -8,6 +8,7 @@ class MyModel:
     def __init__(self, model_path: str, df: DataFrame):
         self.dropped_cols = ["q_id", "doc_id", "label"]
         if not os.path.exists(model_path):
+            print("Start training...")
             self.train(model_path, df)
         self.model = xgb.XGBRanker()
         self.model.load_model(model_path)
@@ -25,9 +26,13 @@ class MyModel:
             tree_method='exact',
             booster='gbtree',
             objective='rank:map',
+            verbosity=1,
+            eta=0.1,
+            max_depth=5,
+            n_estimators=100,
         )
 
-        model.fit(X_train, y_train, group=qids_train, verbose=True)
+        model.fit(X_train, y_train, group=qids_train)
         model.save_model(model_path)
     
     def predict(self, df: DataFrame):

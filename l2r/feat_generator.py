@@ -1,9 +1,10 @@
+from locale import normalize
 import os
 import pandas as pd
 import numpy as np
 from gensim.models import TfidfModel, LsiModel, LdaModel
-from gensim.summarization.bm25 import BM25
 from gensim.similarities import Similarity
+from alt_rank_bm25 import BM25Okapi
 from doc_helper import DocRetrieval
 from utils import read_pred
 
@@ -15,7 +16,7 @@ class GenFeat:
         self.models = [TfidfModel, LsiModel, LdaModel]
     
     def build_model(self, idx, model_cls):
-        model_path = f'./cache_mod/{self.mode}/feat{idx}'
+        model_path = f'./cache_mod/feat{idx}'
         if os.path.exists(model_path):
             model = model_cls.load(model_path)
         else:
@@ -25,7 +26,7 @@ class GenFeat:
         return model
 
     def build_index(self, idx, transform):
-        index_path = f'./cache_sim/{self.mode}/feat{idx}'
+        index_path = f'./cache_sim/feat{idx}.index'
         if os.path.exists(index_path):
             index = Similarity.load(index_path)
         else:
@@ -57,14 +58,16 @@ class GenFeat:
             model = self.build_model(i, model)
             index = self.build_index(i, model)
 
-            sims = map(lambda q: index[model[q]], self.corpus.query2bow)
+            sims = [index[model[q]] for q in self.corpus.query2bow]
             df = df.pipe(fill_feat, np.vstack(sims).ravel())
 
-        bm25_mod = BM25(self.corpus.corpus)
-        sims = map(lambda q: bm25_mod.get_scores(q), self.corpus.query2bow)
+        bm25_mod = BM25Okapi(self.corpus.corpus)
+        sims = [bm25_mod.get_scores(q) for q in self.corpus.query2bow]
         df = df.pipe(fill_feat, np.vstack(sims).ravel())
 
         df.to_csv(file_path, index=False)
+
+        print('Success: feature generation complete!')
 
             
             
