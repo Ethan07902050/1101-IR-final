@@ -1,15 +1,21 @@
 from pathlib import Path
 import json
 import argparse
-import re
 
 import spacy
+from scispacy.abbreviation import AbbreviationDetector
+from scispacy.linking import EntityLinker
 import xml.etree.ElementTree as ET
 
 
 class DocParser:
     def __init__(self, src_dir: Path, dest_dir: Path, nlp="en_core_sci_sm"):
         self.nlp = spacy.load(nlp)
+        self.nlp.add_pipe("abbreviation_detector")
+        # self.nlp.add_pipe(
+        #     "scispacy_linker",
+        #     config={"resolve_abbreviations": True, "linker_name": "umls"},
+        # )
         self.src_dir = src_dir
         self.dest_dir = dest_dir
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -26,11 +32,12 @@ class DocParser:
             # include all contents under p tag recursively
             for text in p.itertext():
                 contents += text.strip()
-        new_item = {"id": doc_id, "contents": contents}
 
-        # extract named entity
         if named_entity:
-            new_item["NER"] = self._get_named_entity(contents)
+            named_entities = self._get_named_entity(contents)
+            contents = " ".join(named_entities)
+
+        new_item = {"id": doc_id, "contents": contents}
 
         # write to json file
         dest_path = (self.dest_dir / doc_id).with_suffix(".json")
@@ -39,15 +46,10 @@ class DocParser:
 
     def _get_named_entity(self, contents: str):
         doc = self.nlp(contents)
-        named_entities = {}
+        abbrev = {abrv: abrv._.long_form for abrv in doc._.abbreviations}
+        named_entities = []
         for ent in doc.ents:
-            # skip numbers
-            replaced_text = re.sub("[.%,: ±]", "0", ent.text)
-            if replaced_text.isnumeric():
-                continue
-            # append named entity
-            named_entities.setdefault(ent.label_, [])
-            named_entities[ent.label_].append(ent.text)
+            named_entities.append(abbrev.get(ent.text) or ent.text)
         return named_entities
 
 
