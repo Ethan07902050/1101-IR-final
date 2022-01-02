@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 from pyserini.search import SimpleSearcher
@@ -21,8 +22,13 @@ def retrieve_query(query_path: Path):
 
 if __name__ == "__main__":
 
+    # parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--index-dir", type=Path)
+    args = parser.parse_args()
+
     data_path = Path("data")
-    searcher = SimpleSearcher(str(data_path / "indexes"))
+    searcher = SimpleSearcher(str(args.index_dir))
 
     # query on training set and testing set
     for dataset in ["train", "test"]:

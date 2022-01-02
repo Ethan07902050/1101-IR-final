@@ -24,6 +24,7 @@ def write_pred(pred_path: Path, pred: Dict[str, List[str]]):
         writer.writeheader()
         for query_id, doc_ids in pred.items():
             writer.writerow({HEADER[0]: query_id, HEADER[1]: " ".join(doc_ids)})
+    print(f"{str(pred_path)} saved")
 
 
 def map_at_k(pred_path: Path, gt_path: Path, k: int):
