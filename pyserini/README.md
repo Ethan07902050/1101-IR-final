@@ -18,8 +18,9 @@
     ```
 
 2. Download language model.
+    <!-- python3 -m spacy download en_core_web_md -->
     ```
-    python3 -m spacy download en_core_web_md
+    pip3 install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.4.0/en_core_sci_sm-0.4.0.tar.gz
     ```
 
 ## Requirements
@@ -27,6 +28,7 @@
 * pyserini
 * open-JDK
 * spacy
+* scispacy
 
 ## Execute
 

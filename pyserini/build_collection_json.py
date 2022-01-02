@@ -8,8 +8,8 @@ import xml.etree.ElementTree as ET
 
 
 class DocParser:
-    def __init__(self, src_dir: Path, dest_dir: Path, language_model="en_core_web_md"):
-        self.language_model = spacy.load(language_model)
+    def __init__(self, src_dir: Path, dest_dir: Path, nlp="en_core_sci_sm"):
+        self.nlp = spacy.load(nlp)
         self.src_dir = src_dir
         self.dest_dir = dest_dir
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -38,7 +38,7 @@ class DocParser:
             json.dump(new_item, fp, ensure_ascii=False)
 
     def _get_named_entity(self, contents: str):
-        doc = self.language_model(contents)
+        doc = self.nlp(contents)
         named_entities = {}
         for ent in doc.ents:
             # skip numbers

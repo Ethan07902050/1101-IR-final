@@ -29,10 +29,11 @@ python3 -m pyserini.index                       \
 --collection JsonCollection                     \
 --generator DefaultLuceneDocumentGenerator      \
 --index $index_path                             \
---threads 1                                     \
+--threads 4                                     \
 --storePositions --storeDocvectors --storeRaw
 
 # query
 echo "Querying..."
 python3 pyserini/query.py                       \
---index-dir $index_path
+--index-dir $index_path                         \
+"$@"
