@@ -40,7 +40,6 @@ class QueryParser:
     def _get_named_entity(self, contents: str):
         doc = self.nlp(contents)
         abbrev = {abrv: abrv._.long_form for abrv in doc._.abbreviations}
-        print(abbrev)
         named_entities = []
         for ent in doc.ents:
             named_entities.append(abbrev.get(ent.text) or ent.text)

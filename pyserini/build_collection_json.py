@@ -21,8 +21,10 @@ class DocParser:
         dest_dir.mkdir(parents=True, exist_ok=True)
 
     def build_collection_json(self, named_entity: bool = False):
+        transformed_doc_paths = [p.stem for p in self.dest_dir.glob("*.json")]
         for doc_path in self.src_dir.iterdir():
-            self._build_document_json(doc_path, named_entity)
+            if doc_path.name not in transformed_doc_paths:
+                self._build_document_json(doc_path, named_entity)
 
     def _build_document_json(self, doc_path: Path, named_entity: bool = False):
         doc_id = doc_path.name
@@ -45,12 +47,21 @@ class DocParser:
             json.dump(new_item, fp, ensure_ascii=False)
 
     def _get_named_entity(self, contents: str):
-        doc = self.nlp(contents)
-        abbrev = {abrv: abrv._.long_form for abrv in doc._.abbreviations}
-        named_entities = []
-        for ent in doc.ents:
-            named_entities.append(abbrev.get(ent.text) or ent.text)
-        return named_entities
+        try:
+            named_entities = []
+            doc = self.nlp(contents)
+            abbrev = {abrv: abrv._.long_form for abrv in doc._.abbreviations}
+            for ent in doc.ents:
+                named_entities.append(abbrev.get(ent.text) or ent.text)
+            return named_entities
+        except ValueError:
+            # spacy throws ValueError when the contents is too long
+            # split the contents into halves
+            words = contents.split(" ")
+            half = int(len(words) / 2)
+            return self._get_named_entity(
+                " ".join(words[:half])
+            ) + self._get_named_entity(" ".join(words[half:]))
 
 
 if __name__ == "__main__":
