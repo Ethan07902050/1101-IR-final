@@ -15,10 +15,18 @@ from scispacy.linking import EntityLinker
 import pyterrier as pt
 
 import utils
+from umls_api import Umls
 
 if not pt.started():
     ssl._create_default_https_context = ssl._create_unverified_context
     pt.init(boot_packages=["com.github.terrierteam:terrier-prf:-SNAPSHOT"])
+
+nlp = spacy.load("en_core_sci_sm")
+nlp.add_pipe("abbreviation_detector")
+nlp.add_pipe(
+    "scispacy_linker",
+    config={"resolve_abbreviations": True, "linker_name": "umls", "threshold": 0.8},
+)
 
 
 def save_result(pred_df, split):
@@ -37,16 +45,27 @@ def save_result(pred_df, split):
         print(f"MAP@50 = {utils.map_at_k(pred_path, gt_path, 50)}")
 
 
-def get_named_entity(contents, model_name):
-    nlp = spacy.load(model_name)
-    nlp.add_pipe("abbreviation_detector")
+def get_named_entity(contents):
     doc = nlp(contents)
     abbrev = {abrv: abrv._.long_form for abrv in doc._.abbreviations}
 
     named_entities = []
+    umls = Umls(
+        "780af12a-a049-4755-9345-539d07d85ae6"
+    )  # should replace with new api_key if expired
     for ent in doc.ents:
         ent_wo_abbrev = abbrev.get(ent.text) or ent.text
-        named_entities.append(ent_wo_abbrev)
+        try:
+            umls_ent_cui = ent._.kb_ents[0][0]
+            sementic_type = [
+                sem["name"]
+                for sem in umls.retrieve_entity(umls_ent_cui)["semanticTypes"]
+            ]
+        except Exception:
+            sementic_type = []
+
+        if "Temporal Concept" not in sementic_type:
+            named_entities.append(ent_wo_abbrev)
 
     return named_entities
 
@@ -64,7 +83,7 @@ def retrieve_query(root):
         paragraphs += words
 
     # get named entities
-    entities = get_named_entity(" ".join(paragraphs), "en_core_sci_sm")
+    entities = get_named_entity(" ".join(paragraphs))
     entity_str = " ".join([e.lower() for e in entities])
     return entity_str
 
