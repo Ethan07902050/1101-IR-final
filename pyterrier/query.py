@@ -45,7 +45,9 @@ def get_named_entity(contents, model_name):
 
     named_entities = []
     for ent in doc.ents:
-        named_entities.append(abbrev.get(ent.text) or ent.text)
+        ent_wo_abbrev = abbrev.get(ent.text) or ent.text
+        named_entities.append(ent_wo_abbrev)
+
     return named_entities
 
 
@@ -90,14 +92,14 @@ def retrieve(query_df, index_dir):
 
     # query expansion
     bo1 = pt.rewrite.Bo1QueryExpansion(index, fb_terms=5, fb_docs=10)
-    kl = pt.rewrite.KLQueryExpansion(index, fb_terms=10, fb_docs=10)
+    kl = pt.rewrite.KLQueryExpansion(index, fb_terms=5, fb_docs=10)
     rm3 = pt.rewrite.RM3(index, fb_terms=5, fb_docs=3)
 
     # retrieval
     dph = pt.BatchRetrieve(index, wmodel="DPH")
     bm25 = pt.BatchRetrieve(index, wmodel="BM25")
 
-    pipeline = dph >> bo1 >> dph
+    pipeline = dph >> kl >> dph >> bo1 >> dph
     pred_df = pipeline.transform(query_df)
     return pred_df
 
