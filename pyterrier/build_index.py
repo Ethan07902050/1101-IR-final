@@ -1,7 +1,6 @@
 from gensim.parsing.preprocessing import preprocess_string
 from gensim.parsing.preprocessing import strip_punctuation
 from gensim.parsing.preprocessing import strip_numeric
-from gensim.parsing.preprocessing import strip_short
 from gensim.parsing.preprocessing import remove_stopwords
 from gensim.parsing.preprocessing import stem_text
 from tqdm import tqdm
@@ -10,7 +9,6 @@ import xml.etree.ElementTree as ET
 import xml.dom.minidom
 
 from pathlib import Path
-import json
 import argparse
 import ssl
 
@@ -34,8 +32,7 @@ def retrieve_doc(root):
     for p in root.findall(".//p"):
         text = ET.tostring(p, method="text").decode("utf-8")
         words = preprocess_string(text, custom_filters)
-        if len(words) > 10:
-            paragraphs += words
+        paragraphs += words
 
     return " ".join(paragraphs)
 
